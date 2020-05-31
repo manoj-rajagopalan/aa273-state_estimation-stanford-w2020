@@ -3,15 +3,17 @@
 %    Class definition for the calculations of a range finder beam.
 %
 % USAGE:
-%    obj = range_finder( pts_arg, rot_ccw_rad, trans_2d )
-%    obj.plot( fmt_string )
+%    obj = range_finder( res_arg )
+%    m_range = obj.range_map( pygons, pt_gbl, bearing_rad_ref )
+%    obj.plot_range_map_min( m_range )
 %
 % INPUTS:
-%    pts_arg        - Nx2 array of vertices defining the range_finder.
-%    rot_ccw_rad    - Rotation to be applied about local [0,0] point, CCW=(+), radians.
-%    trans_2d       - 1x2 or 2x1 translation to be applied.
-%    fmt_string     - format string used by "plot()".
-%                     E.g.:  'b.-'
+%    res_arg          -  angular resolution, i.e. number of divisions per 360 deg.
+%    pt_gbl           -  2x1 global coordinates of range finder.
+%    bearing_rad_ref  -  1x1 orientation (radians) of range finder relative to the environment.
+%
+% OUTPUTS:
+%    m_range  - (res_arg) x (num_polygons)  array of distances to the polygons.
 %
 % by Arjang Hourtash
 % 2020-05-23
