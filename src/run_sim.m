@@ -58,11 +58,11 @@ Qmat = zeros(num_states, num_states);
 % Robot specific process noise:
 Qmat(1:num_states_rbt, 1:num_states_rbt) = sim_dt * diag([0.1, 0.1, 0.2]); % For [Px, Py, theta]
 % Generate process noise for simulation.
-noise_process = mvnrnd( zeros(1, num_states), Qmat, sim_num_iter+1 )'; % +1 so array sizes match.
+noise_process = mvnrnd( zeros(1, num_states), Qmat, sim_num_iter )';
 
 % Measurement noise.
 Rmat = diag( reshape( [0.25; 0.1]*ones(1, num_obst), [], 1 ) ); % Variances for bearing, range.
-noise_measure = mvnrnd( zeros(1, num_measure), Rmat, sim_num_iter+1 )'; % +1 so array sizes match.
+noise_measure = [zeros(num_measure, 1), mvnrnd( zeros(1, num_measure), Rmat, sim_num_iter )']; % 1st column at t=0.
 
 if( true_for_live_plot )
     % Initialize plots.
@@ -72,27 +72,48 @@ end
 % Initialize simulation and filtering.
 % Memory allocation for speed.
 % In the following iteration 1 represents t=0.
-Xt_actual = NaN(num_states, sim_num_iter+1);
-Xt_ekf    = NaN(num_states, sim_num_iter+1);
-Xt_ukf    = NaN(num_states, sim_num_iter+1);
-Xt_fast   = NaN(num_states, sim_num_iter+1);
+Xt_actual = NaN(num_states , sim_num_iter+1);
+Xt_ekf    = NaN(num_states , sim_num_iter+1);
+Xt_ukf    = NaN(num_states , sim_num_iter+1);
+Xt_fast   = NaN(num_states , sim_num_iter+1);
 Yt        = NaN(num_measure, sim_num_iter+1);
 
-% Initialization.
+% Computation time sums.
+flop_time_ekf  = 0;
+flop_time_ukf  = 0;
+flop_time_fast = 0;
+
+% State Initialization.
 X_obst = reshape( all_points, [], 1);
 Xt_actual(:,1) = [rbt.get_state(); X_obst]; % Xt_actual at t=0.
+
+% EKF: Initialization.
+% TBD
+% TBD
+% TBD
+
+% UKF: Initialization.
+Xt_ukf(:,1) = Xt_actual(:,1) + mvnrnd( zeros(1, num_states), Qmat, 1 )'; % t=0.
+sig_ukf = 100*eye(num_states); % Large uncertainty.
+args_FofX  = {rbt};
+args_GofX  = {pfinder};
+ukf_lambda = 2;
+
+% FastSLAM: Initialization.
+% TBD
+% TBD
+% TBD
 
 % Simulation iterations.
 for idt = 2:(sim_num_iter+1)
 
     % PROCESS: Robot dynamics: X_t = f( X_t-1, u_t-1 )
-    rbt = rbt.state_transition( Ut );
-    Xt_actual(:,idt) = [rbt.get_state(); X_obst] + noise_process(:,idt);
+    Xt_actual(:,idt) = slam_FofX( Xt_actual(:,idt-1), Ut, rbt ) ...
+                     +        noise_process(:,idt-1);
 
-    % MEASUREMENT: Range finder: Y_t = g( X_t ). Interweave [relative bearing, range] pairs one at a time.
-    [robot_orientation, robot_position] = rbt.get_pose();
-    [v_bearing_rad_rel, v_range] = pfinder.range_map( all_points, robot_position, robot_orientation );
-    Yt(:,idt) = reshape( [v_bearing_rad_rel; v_range], [], 1) + noise_measure(:,idt);
+    % MEASUREMENT: Range finder: Y_t = g( X_t ).
+    Yt(:,idt) = slam_GofX( Xt_actual(:,idt), Ut, pfinder ) ...
+              + noise_measure(:,idt);
 
     if( true_for_live_plot )
         % Plots.
@@ -101,12 +122,42 @@ for idt = 2:(sim_num_iter+1)
         pause;
     end
 
+    % --------------
     % FILTERS:
-    % TBD: Insert filters here.
-    % TBD: Insert filters here.
-    % TBD: Insert filters here.
+    % --------------
+
+    % EKF:
+    tic;
+    % Insert filter function here.
+    % TBD
+    % TBD
+    % TBD
+    flop_time_ekf = flop_time_ekf + toc;
+
+
+    % UKF:
+    tic;
+    [sig_ukf, Xt_ukf(:,idt)] = unscented_kalman_filter( sig_ukf, Xt_ukf(:,idt-1), ...
+                                   @slam_FofX, args_FofX, ...
+                                   @slam_GofX, args_GofX, ...
+                                   Qmat, Rmat, Ut, Yt(:,idt), ukf_lambda );
+    flop_time_ukf = flop_time_ukf + toc;
+
+
+    % FastSLAM:
+    tic;
+    % Insert filter function here.
+    % TBD
+    % TBD
+    % TBD
+    flop_time_fast = flop_time_fast + toc;
 
 end
+
+fprintf( 'Computations times (cpu seconds per time step) are as follows:\n' );
+fprintf( 'EKF : %f\n', flop_time_ekf  / sim_num_iter );
+fprintf( 'UKF : %f\n', flop_time_ukf  / sim_num_iter );
+fprintf( 'Fast: %f\n', flop_time_fast / sim_num_iter );
 
 % Final result plots.
 plot_results;
