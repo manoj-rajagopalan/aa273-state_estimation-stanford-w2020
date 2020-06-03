@@ -56,12 +56,12 @@ num_measure = 2*num_obst;
 num_states = num_states_rbt + num_states_obst;
 Qmat = zeros(num_states, num_states);
 % Robot specific process noise:
-Qmat(1:num_states_rbt, 1:num_states_rbt) = sim_dt * diag([0.1, 0.1, 0.2]); % For [Px, Py, theta]
+Qmat(1:num_states_rbt, 1:num_states_rbt) = sim_dt * diag([0.01, 0.01, 0.02]); % For [Px, Py, theta]
 % Generate process noise for simulation.
 noise_process = mvnrnd( zeros(1, num_states), Qmat, sim_num_iter )';
 
 % Measurement noise.
-Rmat = diag( reshape( [0.25; 0.1]*ones(1, num_obst), [], 1 ) ); % Variances for bearing, range.
+Rmat = diag( reshape( [0.002; 0.001]*ones(1, num_obst), [], 1 ) ); % Variances for bearing, range.
 noise_measure = [zeros(num_measure, 1), mvnrnd( zeros(1, num_measure), Rmat, sim_num_iter )']; % 1st column at t=0.
 
 if( true_for_live_plot )
@@ -117,6 +117,9 @@ for idt = 2:(sim_num_iter+1)
 
     if( true_for_live_plot )
         % Plots.
+        v_bearing_rad_rel = Yt(1:2:end,idt);
+        v_range           = Yt(2:2:end,idt);
+        rbt = rbt.set_state( Xt_actual(1:3,idt) );
         plot_scene_points( f1, f2, all_points, rbt, pfinder, v_bearing_rad_rel, v_range );
         fprintf( 'Press <enter> to advance to the next frame.\n' );
         pause;
