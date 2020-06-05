@@ -94,7 +94,8 @@ Xt_actual(:,1) = [rbt.get_state(); X_obst]; % Xt_actual at t=0.
 
 % UKF: Initialization.
 Xt_ukf(:,1) = Xt_actual(:,1) + mvnrnd( zeros(1, num_states), Qmat, 1 )'; % t=0.
-sig_ukf = 100*eye(num_states); % Large uncertainty.
+sig_ukf = zeros(num_states, num_states, sim_num_iter+1);
+sig_ukf(:,:,1) = 100*eye(num_states); % Large uncertainty.
 args_FofX  = {rbt};
 args_GofX  = {pfinder};
 ukf_lambda = 2;
@@ -140,7 +141,8 @@ for idt = 2:(sim_num_iter+1)
 
     % UKF:
     tic;
-    [sig_ukf, Xt_ukf(:,idt)] = unscented_kalman_filter( sig_ukf, Xt_ukf(:,idt-1), ...
+    sig_ukf_prev = squeeze(sig_ukf(:,:,idt-1))
+    [sig_ukf(:,:,idt), Xt_ukf(:,idt)] = unscented_kalman_filter( sig_ukf_prev, Xt_ukf(:,idt-1), ...
                                    @slam_FofX, args_FofX, ...
                                    @slam_GofX, args_GofX, ...
                                    Qmat, Rmat, Ut, Yt(:,idt), ukf_lambda );
