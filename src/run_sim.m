@@ -96,6 +96,11 @@ Xt_actual(:,1) = [rbt.get_state(); X_obst]; % Xt_actual at t=0.
 Xt_ukf(:,1) = Xt_actual(:,1) + mvnrnd( zeros(1, num_states), Qmat, 1 )'; % t=0.
 sig_ukf = zeros(num_states, num_states, sim_num_iter+1);
 sig_ukf(:,:,1) = 100*eye(num_states); % Large uncertainty.
+
+% UKF: predicted mean and covariance, for smoothing later at end
+Xt_ukf_pred = zeros(size(Xt_ukf));
+sig_ukf_pred = zeros(num_states, num_states, sim_num_iter+1);
+
 args_FofX  = {rbt};
 args_GofX  = {pfinder};
 ukf_lambda = 2;
@@ -141,11 +146,12 @@ for idt = 2:(sim_num_iter+1)
 
     % UKF:
     tic;
-    sig_ukf_prev = squeeze(sig_ukf(:,:,idt-1))
-    [sig_ukf(:,:,idt), Xt_ukf(:,idt)] = unscented_kalman_filter( sig_ukf_prev, Xt_ukf(:,idt-1), ...
-                                   @slam_FofX, args_FofX, ...
-                                   @slam_GofX, args_GofX, ...
-                                   Qmat, Rmat, Ut, Yt(:,idt), ukf_lambda );
+    sig_ukf_prev = squeeze(sig_ukf(:,:,idt-1));
+    [sig_ukf_pred(:,:,idt), Xt_ukf_pred(:,idt), sig_ukf(:,:,idt), Xt_ukf(:,idt)] = ...
+        unscented_kalman_filter( sig_ukf_prev, Xt_ukf(:,idt-1), ...
+                                 @slam_FofX, args_FofX, ...
+                                 @slam_GofX, args_GofX, ...
+                                 Qmat, Rmat, Ut, Yt(:,idt), ukf_lambda );
     flop_time_ukf = flop_time_ukf + toc;
 
 
@@ -163,6 +169,12 @@ fprintf( 'Computations times (cpu seconds per time step) are as follows:\n' );
 fprintf( 'EKF : %f\n', flop_time_ekf  / sim_num_iter );
 fprintf( 'UKF : %f\n', flop_time_ukf  / sim_num_iter );
 fprintf( 'Fast: %f\n', flop_time_fast / sim_num_iter );
+
+tic;
+Xt_ukf_s = kalman_smoothing(Xt_ukf_pred, sig_ukf_pred, ...
+                            Xt_ukf, sig_ukf, ...
+                            Ut, rbt, sim_num_iter);
+fprintf( 'UKS : %f\n', toc);
 
 % Final result plots.
 plot_results;

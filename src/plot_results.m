@@ -12,6 +12,7 @@ for idx = 1:num_states_rbt
                  Xt_ekf(idx,:)', ...
                  Xt_ukf(idx,:)', ...
                  Xt_fast(idx,:)']*mult );
+
     grid on;
     switch( idx )
         case 1
@@ -19,6 +20,29 @@ for idx = 1:num_states_rbt
             title( 'Robot positions and orientations, and estimates.' )
             legend( 'Actual', 'EKF', 'UKF', 'FastSLAM', ...
                     'Location', 'South', 'Orientation', 'Horizontal' );
+        case 2
+            ylabel( 'P_y' );
+        case 3
+            ylabel( '\theta (deg)' );
+    end
+end
+xlabel( 'time (normalized to 1)' );
+linkaxes( h1, 'x' );
+
+% UKF
+figure;
+clear h1;
+for idx = 1 : num_states_rbt
+    h1(idx) = subplot(num_states_rbt, 1, idx);
+    plot( tvec, Xt_actual(idx,:)', 'r-', ...
+          tvec, Xt_ukf(idx,:)', 'b-', ...
+          tvec, Xt_ukf_s(idx,:)', 'k.' );
+    grid on;
+    switch( idx )
+        case 1
+            ylabel( 'P_x' );
+            title( 'Robot positions and orientations, and estimates.' )
+            legend( 'Actual', 'UKF', 'UKS');
         case 2
             ylabel( 'P_y' );
         case 3
