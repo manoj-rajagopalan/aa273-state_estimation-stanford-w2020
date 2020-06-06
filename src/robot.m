@@ -82,6 +82,13 @@ classdef robot
                                                    vel_lin_ang(2) ];
         end
 
+        function J = state_jacobian( obj, vel_lin_ang )
+            theta = obj.state(3);
+            V = vel_lin_ang(1);
+            J = eye(3);
+            J(1,3) = -obj.sim_dt * V * sin(theta);
+            J(2,3) =  obj.sim_dt * V * cos(theta);
+        end
 
         % Verified 2020-05-24.
         function plot( obj, fmt_string )
