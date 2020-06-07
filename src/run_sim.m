@@ -171,7 +171,7 @@ for idt = 2:(sim_num_iter+1)
                      +        noise_process(:,idt-1);
 
     % MEASUREMENT: Range finder: Y_t = g( X_t ).
-    Yt(:,idt) = slam_GofX( Xt_actual(:,idt), Ut, pfinder ) ...
+    Yt(:,idt) = slam_GofX( Xt_actual(:,idt), pfinder ) ...
               + noise_measure(:,idt);
 
     if( true_for_live_plot )

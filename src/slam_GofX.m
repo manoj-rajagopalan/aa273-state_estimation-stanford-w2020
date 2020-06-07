@@ -20,7 +20,7 @@
 %
 % by Arjang Hourtash
 
-function Y_t = slam_GofX( X_t, U_t, pfinder )
+function Y_t = slam_GofX( X_t, pfinder )
 
 % Unpack X_t.
 robot_position = X_t(1:2);

@@ -42,7 +42,7 @@ end
 % 2. Update: using sigma-points.
 y_sig_pts_predict = NaN(num_measure, num_weights);
 for idx = 1:num_weights
-    y_sig_pts_predict(:,idx) = GofX( x_sig_pts_predict(:,idx), Uvec, args_GofX{:} );
+    y_sig_pts_predict(:,idx) = GofX( x_sig_pts_predict(:,idx), args_GofX{:} );
 end
 
 % 2. Update: Apply inverse UT.
