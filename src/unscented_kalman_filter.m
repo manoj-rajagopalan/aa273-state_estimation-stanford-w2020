@@ -6,14 +6,11 @@
 %    2. Update.
 %
 % USAGE:
-%    [sig_pred, mu_pred, sig, mu] = ...
-%      unscented_kalman_filter( sig, mu, @FofX, args_FofX, @GofX, args_GofX, Qmat, Rmat, Uvec, Yvec, lambda )
+%    [sig, mu] = unscented_kalman_filter( sig, mu, @FofX, args_FofX, @GofX, args_GofX, Qmat, Rmat, Uvec, Yvec, lambda )
 %
 % INPUTS:
-%    sig_pred  - N x N: Predited Coviance matrix of states at t=0, for smoothing.
-%    mu_pred   - N x 1: Predicted Mean vector of states at t=0, for smoothing.
-%    sig       - N x N: Final (updated) Coviance matrix of states at t=0.
-%    mu        - N x 1: Final (updated) Mean vector of states at t=0.
+%    sig       - N x N: Coviance matrix of states at t=0.
+%    mu        - N x 1: Mean vector of states at t=0.
 %    FofX      - function pointer in the form:  X_t+1 = FofX( X_t, Uvec )
 %    args_FofX - cell array of additional parameters needed for FofX().
 %    GofX      - function pointer in the form:  Y_t   = GofX( X_t, Uvec )
@@ -28,9 +25,9 @@
 %    sig  - N x N: Covariance matrix of states.
 %    mu   - N x 1: Mean vector of states.
 %
-% by Arjang Hourtash (smoothing contribs by Manoj Rajagopalan)
+% by Arjang Hourtash
 
-function [sig_pred, mu_pred, sig, mu] = unscented_kalman_filter( sig, mu, FofX, args_FofX, GofX, args_GofX, Qmat, Rmat, Uvec, Yvec, lambda )
+function [sig, mu] = unscented_kalman_filter( sig, mu, FofX, args_FofX, GofX, args_GofX, Qmat, Rmat, Uvec, Yvec, lambda )
 
 num_measure = length( Yvec );
 
@@ -64,8 +61,6 @@ yy_sig_predict = yy_sig_predict + Rmat;
 Kgain = xy_sig_predict * inv( yy_sig_predict );
 mu  = x_mu_predict   + Kgain * (Yvec - y_mu_predict);
 sig = xx_sig_predict - Kgain * ( xy_sig_predict' );
-mu_pred = x_mu_predict;
-sig_pred = xx_sig_predict;
 
 end
 

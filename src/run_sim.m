@@ -30,6 +30,10 @@
 %
 function run_sim( true_for_live_plot )
 
+
+%true_for_live_plot = 0;
+
+
 % Useful constants.
 sim_t_final  = 1.0;
 sim_dt       = 0.01;
@@ -41,12 +45,24 @@ all_points = init_points();
 num_obst = size( all_points, 2 );
 num_states_obst = numel( all_points );
 
+% %
+% % Leo, 2020/06/04
+% %
+% % Conver all_points to map structure data type
+% map = convertPoints2Map(all_points);
+% 
+% % Get the number of landmarks
+% NLandmarks = size(map,2);
+
+
+
 % Initialize Robot.
 rbt = robot( sim_dt );
 num_states_rbt = length( rbt.get_state() );
 turn_radius = 0.2;
-rbt = rbt.set_state( [0.5 + turn_radius; 0.4; pi/2] ); % Initial state.
-Ut = [2*pi*turn_radius; 2*pi]; % Constant input.
+rbt = rbt.set_state( [0.5 + turn_radius; 0.4; pi/2] ); % Initial state. = X0
+%X0  = rbt.state;      % JDLee, 2020/6/5
+Ut = [2*pi*turn_radius; 2*pi]; % Constant input. (constant input?)
 
 % Initialize point finder.
 pfinder = point_finder();
@@ -94,21 +110,58 @@ Xt_actual(:,1) = [rbt.get_state(); X_obst]; % Xt_actual at t=0.
 
 % UKF: Initialization.
 Xt_ukf(:,1) = Xt_actual(:,1) + mvnrnd( zeros(1, num_states), Qmat, 1 )'; % t=0.
-sig_ukf = zeros(num_states, num_states, sim_num_iter+1);
-sig_ukf(:,:,1) = 100*eye(num_states); % Large uncertainty.
-
-% UKF: predicted mean and covariance, for smoothing later at end
-Xt_ukf_pred = zeros(size(Xt_ukf));
-sig_ukf_pred = zeros(num_states, num_states, sim_num_iter+1);
-
+sig_ukf = 100*eye(num_states); % Large uncertainty.
 args_FofX  = {rbt};
 args_GofX  = {pfinder};
 ukf_lambda = 2;
 
-% FastSLAM: Initialization.
-% TBD
-% TBD
-% TBD
+
+
+%
+% FastSLAM: Initialization - JDLee, 2020/6/4
+%
+
+global numParticles;         % number of particles
+global Q;                    % process noise
+global R;                    % measurement noise for range and bearing
+global dT;                   % simulation time step
+global Beta;                 % resample threadhold for ESS [0 1]
+
+numParticles = 35;
+dT = sim_dt;
+Beta = 0.8;
+
+% Conver all_points to map structure data type
+map = convertPoints2Map(all_points);
+
+% Get the number of landmarks
+NLandmarks = size(map,2);
+
+% Process noise covariance for particle filters: Q[3X3]
+Q = Qmat(1:3,1:3);
+R = Rmat(1:2,1:2);
+R = zeros(2);
+R(1,1) = Rmat(2,2);    % because my measurement model is [range; bearing]
+R(2,2) = Rmat(1,1);
+
+% Initialize the Xt_fast
+Xt_fast(1:3,1) = rbt.get_state();
+Xt_fast(4:11,1) = zeros(8,1);
+
+% Initialize the particles array
+for i = 1:numParticles
+    particles(i).weight = 1/numParticles;
+    %particles(i).pose = zeros(3,1);                % robotX, robotY, theta
+    particles(i).pose = rbt.get_state();            % X0 
+    particles(i).history = {};                      % empty cell array
+    for l = 1:NLandmarks
+        particles(i).landmarks(l).observed = false;
+        particles(i).landmarks(l).mu = zeros(2,1);  % mjx, mjy
+        particles(i).landmarks(l).sigma = zeros(2,2);
+    end
+end
+
+
 
 % Simulation iterations.
 for idt = 2:(sim_num_iter+1)
@@ -135,48 +188,94 @@ for idt = 2:(sim_num_iter+1)
     % FILTERS:
     % --------------
 
-    % EKF:
+%     % EKF:
+%     tic;
+%     % Insert filter function here.
+%     % TBD
+%     % TBD
+%     % TBD
+%     flop_time_ekf = flop_time_ekf + toc;
+
+
+%     % UKF:
+%     tic;
+%     [sig_ukf, Xt_ukf(:,idt)] = unscented_kalman_filter( sig_ukf, Xt_ukf(:,idt-1), ...
+%                                    @slam_FofX, args_FofX, ...
+%                                    @slam_GofX, args_GofX, ...
+%                                    Qmat, Rmat, Ut, Yt(:,idt), ukf_lambda );
+%     flop_time_ukf = flop_time_ukf + toc;
+    
+    
+
+    % *********************************************************************
+    %
+    % FastSLAM: J.D. Lee, 2020/6/5
+    %
+    % *********************************************************************
+    
     tic;
-    % Insert filter function here.
-    % TBD
-    % TBD
-    % TBD
-    flop_time_ekf = flop_time_ekf + toc;
-
-
-    % UKF:
-    tic;
-    sig_ukf_prev = squeeze(sig_ukf(:,:,idt-1));
-    [sig_ukf_pred(:,:,idt), Xt_ukf_pred(:,idt), sig_ukf(:,:,idt), Xt_ukf(:,idt)] = ...
-        unscented_kalman_filter( sig_ukf_prev, Xt_ukf(:,idt-1), ...
-                                 @slam_FofX, args_FofX, ...
-                                 @slam_GofX, args_GofX, ...
-                                 Qmat, Rmat, Ut, Yt(:,idt), ukf_lambda );
-    flop_time_ukf = flop_time_ukf + toc;
-
-
-    % FastSLAM:
-    tic;
-    % Insert filter function here.
-    % TBD
-    % TBD
+    
+    % Prediction step of particle filter
+    controlInp = Ut;
+    particles  = prediction_step(particles, controlInp);
+    
+    % Perform the correction step of the particle filter
+    % Current measurement
+    Ytt = Yt(:,idt);
+    yt = convertYt(Ytt);
+    particles = correction_step(particles, yt);
+    
     % TBD
     flop_time_fast = flop_time_fast + toc;
+    
+    % 
+    % Generate visualization plots of the current state of the filter
+    %
+    pauseTime = 0.1;
+    plot_state(particles, map, pauseTime);
+    
+    Xt_fast(:,idt) = getBestState(particles, NLandmarks);      % Save the best robot state
+
+    % Resample the particle set
+    particles    = resample(particles);
+    
+    % *********************************************************************
+    %
+    % End of FastSLAM
+    %
+    % *********************************************************************
 
 end
+
+% Plot the final state of FastSLAM
+plot_FinalState(Xt_actual, particles, map);
+
+
+
 
 fprintf( 'Computations times (cpu seconds per time step) are as follows:\n' );
 fprintf( 'EKF : %f\n', flop_time_ekf  / sim_num_iter );
 fprintf( 'UKF : %f\n', flop_time_ukf  / sim_num_iter );
 fprintf( 'Fast: %f\n', flop_time_fast / sim_num_iter );
 
-tic;
-Xt_ukf_s = kalman_smoothing(Xt_ukf_pred, sig_ukf_pred, ...
-                            Xt_ukf, sig_ukf, ...
-                            Ut, rbt, sim_num_iter);
-fprintf( 'UKS : %f\n', toc);
-
 % Final result plots.
-plot_results;
+%plot_results;
+plotResultsLeo;
 
 end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
