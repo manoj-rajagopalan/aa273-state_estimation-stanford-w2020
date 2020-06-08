@@ -37,7 +37,7 @@ function run_sim( true_for_live_plot )
 % Useful constants.
 sim_t_final  = 1.0;
 sim_dt       = 0.01;
-sim_num_iter = round( sim_t_final / sim_dt );
+sim_num_iter = round( sim_t_final / sim_dt ) * 2;
 tvec = linspace( 0, sim_t_final, sim_num_iter+1 )';
 
 % Initialize the points in the environment.
@@ -133,15 +133,15 @@ sig_ukf = zeros(num_states, num_states, sim_num_iter+1);
 sig_ukf(:,:,1) = 100*eye(num_states); % Large uncertainty.
 
 % Particle filter initialization
+enable_pf = true;
+
 Xt_particles = rand(size(Xt_particles));
 Xt_particles(3,:) = 2*pi * (Xt_particles(3,:) - 0.5); % adjust theta range
 Wt_particles = 1.0/num_particles * ones(num_particles,1);
 Xt_pf(:,1) = Xt_particles * Wt_particles; % mean position
 Xt_pf(:,1) = mean(Xt_particles,2);
 
-pf_rbt_loc_convergence(1) = norm(Xt_pf(1:2,1) - Xt_actual(1:2,1));
-pf_rbt_theta_convergence(1) = abs(Xt_pf(3,1) - Xt_actual(3,1));
-pf_map_convergence(1) = norm(Xt_pf(4:end,1) - Xt_actual(4:end,1));
+pf_convergence = NaN(num_measure+2, sim_num_iter+1);
 
 args_FofX  = {rbt};
 args_GofX  = {pfinder};
@@ -293,41 +293,38 @@ for idt = 2:(sim_num_iter+1)
     %
     % *********************************************************************
     
-    tic;
-%     Qmat_pf = Qmat;
-%     Qmat_pf((num_states_rbt+1):end,(num_states_rbt+1):end) = 0.1 * eye(num_states_obst);
-    Qmat_pf = 0.1 * eye(num_states);
 
-    for ip = 1 : num_particles
-        Xt_particles(:,ip) = slam_FofX(Xt_particles(:,ip), Ut, rbt);
-        % Artificially add noise to map terms so that cov matrix is
-        % non-singular. Pristine Qmat only has non-zero diags for robot,
-        % not map.
-        pred_noise = aa273_mvnrnd(zeros(num_states,1), Qmat_pf, 1);
-        % w_pred = mvnpdf(pred_noise', [], Qmat_pf);
-        w_pred = aa273_mvnpdf(pred_noise, zeros(size(pred_noise)), Qmat_pf);
-        Xt_particles(:,ip) = Xt_particles(:,ip) + pred_noise;
-        g_particle = slam_GofX(Xt_particles(:,ip), pfinder);
-        % w_meas = mvnpdf((Yt(:,idt) - g_particle)', [], Rmat);
-        w_meas = aa273_mvnpdf(Yt(:,idt), g_particle, Rmat);
-        Wt_particles(ip) = w_meas * w_pred * Wt_particles(ip); % unnormalized
+    if enable_pf
+        tic;
+        Qmat_pf = 0.49 * eye(num_states);
+        Qmat_pf_sqrt = 0.7 * eye(num_states);
+
+        for ip = 1 : num_particles
+            Xt_particles(:,ip) = slam_FofX(Xt_particles(:,ip), Ut, rbt);
+            % Artificially add noise to map terms so that cov matrix is
+            % non-singular. Pristine Qmat only has non-zero diags for robot,
+            % not map.
+            pred_noise = aa273_mvnrnd(zeros(num_states,1), Qmat_pf_sqrt, 1);
+            w_pred = aa273_mvnpdf(pred_noise, zeros(size(pred_noise)), Qmat_pf);
+            Xt_particles(:,ip) = Xt_particles(:,ip) + pred_noise;
+            g_particle = slam_GofX(Xt_particles(:,ip), pfinder);
+            w_meas = aa273_mvnpdf(Yt(:,idt), g_particle, Rmat);
+            Wt_particles(ip) = w_meas; % * Wt_particles(ip); % unnormalized
+        end
+        Wt_particles = Wt_particles / sum(Wt_particles); % normalize
+        Wt_particles_cum = cumsum(Wt_particles);
+        new_sample_w = 1.0/num_particles * (rand() + (0:(num_particles-1)));
+        [~, bins] = histc(new_sample_w, Wt_particles_cum);
+        Xt_particles = Xt_particles(:,1+bins);
+        Wt_particles = Wt_particles / sum(Wt_particles); % normalize
+
+        % Analytics
+        flop_time_pf = flop_time_pf + toc;
+        [Xt_pf(:,idt), sig_pf] = aa273_mean_and_cov(Xt_particles, Wt_particles);
+        pf_det_sigma(idt) = det(sig_pf);
+        pf_convergence(:,idt) = convergence(Yt(:,idt), ...
+                                            slam_GofX(Xt_pf(:,idt), pfinder));
     end
-    Wt_particles = Wt_particles / sum(Wt_particles); % normalize
-    Wt_particles_cum = cumsum(Wt_particles);
-    new_sample_w = 1.0/num_particles * (rand() + (0:(num_particles-1)));
-    [~, bins] = histc(new_sample_w, Wt_particles_cum);
-    Xt_particles = Xt_particles(:,1+bins);
-    Wt_particles = Wt_particles / sum(Wt_particles); % normalize
-    
-    % Analytics
-    flop_time_pf = flop_time_pf + toc;
-    [Xt_pf(:,idt), sig_pf] = aa273_mean_and_cov(Xt_particles, Wt_particles);
-%     Xt_pf(:,idt) = Xt_particles * Wt_particles;
-%     sig_pf = var(Xt_particles, Wt_particles, 2);
-    pf_det_sigma(idt) = det(sig_pf);
-    pf_rbt_loc_convergence(idt) = norm(Xt_pf(1:2,idt) - Xt_actual(1:2,idt));
-    pf_rbt_theta_convergence(idt) = abs(Xt_pf(3,idt) - Xt_actual(3,idt));
-    pf_map_convergence(idt) = norm(Xt_pf(4:end,idt) - Xt_actual(4:end,idt));
 end
 
 
@@ -339,12 +336,10 @@ fprintf( 'PF  : %f\n', flop_time_pf / sim_num_iter );
 
 % Final result plots.
 %plot_results;
-plotResultsLeo;
+%+ plotResultsLeo;
 
 plot_convergence(sim_dt, ...
-                 pf_rbt_loc_convergence, ...
-                 pf_rbt_theta_convergence, ...
-                 pf_map_convergence, ...
+                 pf_convergence, ...
                  pf_det_sigma);
 
 end
