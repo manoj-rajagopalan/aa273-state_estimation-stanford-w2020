@@ -436,11 +436,11 @@ error_scores.fast = composite_algo_error( Xt_actual - Xt_fast, dYt_fast, 'Fast' 
 error_scores.pf   = composite_algo_error( Xt_actual - Xt_pf  , dYt_pf, 'PF' );
 
 % Final result plots.
-enable_plot_fast        = 0;
-enable_plot_states      = 0;
-enable_plot_measures    = 0;
-enable_plot_map_no_time = 0;
-enable_plot_metrics     = 0;
+enable_plot_fast        = 1;
+enable_plot_states      = 1;
+enable_plot_measures    = 1;
+enable_plot_map_no_time = 1;
+enable_plot_metrics     = 1;
 
 plot_results;
 
