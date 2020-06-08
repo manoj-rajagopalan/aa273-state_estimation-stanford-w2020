@@ -5,7 +5,7 @@
 %    Note that the inputs and output are transpose w.r.t. mvnpdf.
 %
 % USAGE:
-%    mat = aa273_mvnpdf( X, mu, sigma )
+%    p = aa273_mvnpdf( X, mu, sigma )
 %
 % INPUTS:
 %    X     - d x n matrix whose columns are d-dimensional samples
@@ -22,11 +22,12 @@
 function p = aa273_mvnpdf(X, mu, sigma)
 [d, n] = size(X);
 x_minus_mu = X - repmat(mu,1,n);
+x_minus_mu(3,:) = aa273_wrapToPi(x_minus_mu(3,:));
 sigma_inv_x_minus_mu = linsolve(sigma, x_minus_mu);
 num = zeros(1,n);
 for i = 1 : n
     num(i) = exp( -0.5 * x_minus_mu(:,i)' * sigma_inv_x_minus_mu(:,i) );
 end
-denom_sqr = (2 * pi)^numel(d) * det(sigma);
+denom_sqr = (2 * pi)^d * det(sigma);
 p = num / sqrt(denom_sqr);
 end
