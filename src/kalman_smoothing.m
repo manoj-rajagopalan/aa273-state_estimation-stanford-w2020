@@ -8,7 +8,7 @@ function mu_bw_seq = kalman_smoothing(mu_pred_fw_seq, sig_pred_fw_seq, ...
     for idt = sim_num_iter : -1 : 1
         
         % Evaluate Jacobian and the precursor to Kalman smoother gain
-        A = slam_dFofX_by_dX( mu_fw_seq(:,idt), U_t, rbt );
+        A = slam_JacF( mu_fw_seq(:,idt), U_t, rbt );
         Ks_pre = squeeze( sig_fw_seq(:,:,idt) ) * A';
         
         % Smoothed mean

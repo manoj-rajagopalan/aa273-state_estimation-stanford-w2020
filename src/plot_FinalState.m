@@ -37,7 +37,7 @@ for i = 1:length(particles(bestParticleIdx).landmarks)
 end
 
 ldg = legend([p1,p2,p3,p4], 'Landmarks - Actual', 'Robot Path - Actual', 'FastSLAM - Robot Path', 'Landmarks - FastSLAM');
-ldg.FontSize = 15;
+%ldg.FontSize = 15;
 title('FastSLAM', 'FontSize', 15)
 xlabel('X');
 ylabel('Y');

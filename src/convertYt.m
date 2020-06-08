@@ -14,7 +14,7 @@
 
 function yt = convertYt(Yt)
 
-for i = 1:4
+for i = 1:(length(Yt)/2)
     id = i;
     range_i   = Yt(2*i);
     bearing_i = Yt(2*i - 1);

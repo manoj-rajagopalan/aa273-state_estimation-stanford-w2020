@@ -83,6 +83,31 @@ classdef robot
         end
 
 
+        % Generate partial derivative of [state transition] with respect to [states].
+        %                         / 0  ,  0  ,  -sin(O_t) \
+        %    Jac = I_3 + dt * V * | 0  ,  0  ,   cos(O_t) |
+        %                         \ 0  ,  0  ,       0    /
+        %
+        % INPUTS:
+        %    Same as those for "state_transition()".
+        %
+        % OUTPUTS:
+        %    Jac_transition - Jacobian:
+        %                     rows = [Pxy, orientation]
+        %                     cols = [Pxy, orientation]
+        %
+        % Verified 2020-06-05.
+        function Jac_transition = Jacobian_state_transition( obj, vel_lin_ang )
+            Pxy = obj.state(1:2);
+            th  = obj.state(3);
+            Vt  = vel_lin_ang(1);
+            phi = vel_lin_ang(2);
+            Jac_transition = eye(size(obj.state,1));
+            Jac_transition(1:2,3) = Jac_transition(1:2,3) + obj.sim_dt * Vt * [-sin(th);
+                                                                                cos(th)];
+        end
+
+
         % Verified 2020-05-24.
         function plot( obj, fmt_string )
             obj.pygon = obj.pygon.set_transform( obj.state(3), obj.state(1:2) );
@@ -95,12 +120,3 @@ classdef robot
     end
 
 end
-
-
-
-
-
-
-
-
-
